@@ -23,6 +23,43 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type VHostSRSHLSConfigSpec struct {
+	Enabled   bool    `json:"enabled,omitempty"`
+	Fragment  *int32  `json:"hlsFragment,omitempty"`
+	Window    *int32  `json:"hlsWindow,omitempty"`
+	Path      *string `json:"hlsPath,omitempty"`
+	M3U8File  *string `json:"hlsM3u8_file,omitempty"`
+	TSFile    *string `json:"hlsTs_file,omitempty"`
+	CleanUp   *bool   `json:"hlsCleanup,omitempty"`
+	NBNotify  *int32  `json:"hlsNbNotify,omitempty"`
+	WaitFrame *bool   `json:"hlsWaitKeyframe,omitempty"`
+}
+
+// VHostSRSConfigSpec
+type VHostSRSConfigSpec struct {
+	Name       string                 `json:"name"`
+	Enabled    *bool                  `json:"enabled,omitempty"`
+	MixCorrect *bool                  `json:"mixCorrect,omitempty"`
+	HLS        *VHostSRSHLSConfigSpec `json:"hls,omitempty"`
+}
+
+type SRSConfigServerSpec struct {
+	Enabled bool   `json:"enabled,omitempty"`
+	Listen  *int32 `json:"listen,omitempty"`
+}
+
+// SRSConfigSpec Configuration
+type SRSConfigSpec struct {
+	Daemon         bool                 `json:"daemon,omitempty"`
+	MaxConnextions *int32               `json:"maxConnections,omitempty"`
+	Listen         *int32               `json:"listen,omitempty"`
+	API            *SRSConfigServerSpec `json:"api,omitempty"`
+	Server         *SRSConfigServerSpec `json:"server,omitempty"`
+	VHosts         []VHostSRSConfigSpec `json:"vhosts,omitempty"`
+
+	Origins []string `json:"-"`
+}
+
 // SRSClusterSpec defines the desired state of SRSCluster
 type SRSClusterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -36,6 +73,9 @@ type SRSClusterSpec struct {
 
 	// ServiceName Service name
 	ServiceName string `json:"serviceName,omitempty"`
+
+	// Config SRS configuration
+	Config *SRSConfigSpec `json:"config,omitempty"`
 }
 
 // SRSClusterStatus defines the observed state of SRSCluster

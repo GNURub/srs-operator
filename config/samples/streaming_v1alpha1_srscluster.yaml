@@ -3,5 +3,5 @@ kind: SRSCluster
 metadata:
   name: srscluster-sample
 spec:
-  # Add fields here
-  foo: bar
+  # SRS Origin servers
+  size: 3

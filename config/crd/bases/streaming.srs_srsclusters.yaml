@@ -1,0 +1,143 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.3.0
+  creationTimestamp: null
+  name: srsclusters.streaming.srs
+spec:
+  group: streaming.srs
+  names:
+    kind: SRSCluster
+    listKind: SRSClusterList
+    plural: srsclusters
+    singular: srscluster
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: SRSCluster is the Schema for the srsclusters API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: SRSClusterSpec defines the desired state of SRSCluster
+          properties:
+            config:
+              description: Config SRS configuration
+              properties:
+                api:
+                  properties:
+                    enabled:
+                      type: boolean
+                    listen:
+                      format: int32
+                      type: integer
+                  type: object
+                daemon:
+                  type: boolean
+                listen:
+                  format: int32
+                  type: integer
+                maxConnections:
+                  format: int32
+                  type: integer
+                server:
+                  properties:
+                    enabled:
+                      type: boolean
+                    listen:
+                      format: int32
+                      type: integer
+                  type: object
+                vhosts:
+                  items:
+                    description: VHostSRSConfigSpec
+                    properties:
+                      enabled:
+                        type: boolean
+                      hls:
+                        properties:
+                          enabled:
+                            type: boolean
+                          hlsCleanup:
+                            type: boolean
+                          hlsFragment:
+                            format: int32
+                            type: integer
+                          hlsM3u8_file:
+                            type: string
+                          hlsNbNotify:
+                            format: int32
+                            type: integer
+                          hlsPath:
+                            type: string
+                          hlsTs_file:
+                            type: string
+                          hlsWaitKeyframe:
+                            type: boolean
+                          hlsWindow:
+                            format: int32
+                            type: integer
+                        type: object
+                      mixCorrect:
+                        type: boolean
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  type: array
+              type: object
+            image:
+              description: 'Image version SRS, default: ossrs/srs:v4.0.56'
+              type: string
+            serviceName:
+              description: ServiceName Service name
+              type: string
+            size:
+              description: Size ClusterOrigin size
+              format: int32
+              type: integer
+          required:
+          - size
+          type: object
+        status:
+          description: SRSClusterStatus defines the observed state of SRSCluster
+          properties:
+            availableReplicas:
+              format: int32
+              type: integer
+            podNames:
+              items:
+                type: string
+              type: array
+          required:
+          - availableReplicas
+          - podNames
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

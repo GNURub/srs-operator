@@ -17,8 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"reflect"
+	"text/template"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -65,16 +67,39 @@ func (r *SRSClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return reconcile.Result{}, err
 	}
 
-	// Check if the stateful already exists, if not create a new one
-	found := &appsv1.StatefulSet{}
-	err = r.Get(ctx, types.NamespacedName{Name: srsInstance.Name, Namespace: srsInstance.Namespace}, found)
+	serviceName := "srs_cluster_svc"
+
+	if len(srsInstance.Spec.ServiceName) > 0 {
+		serviceName = srsInstance.Spec.ServiceName
+	}
+
+	// Check if the ConfigMap already exists, if not create a new one
+	configFound := &corev1.ConfigMap{}
+	err = r.Get(ctx, types.NamespacedName{Name: srsInstance.Name, Namespace: srsInstance.Namespace}, configFound)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
-		dep := r.statefulSetForSRS(srsInstance)
-		log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", dep.Namespace, "StatefulSet.Name", dep.Name)
-		err = r.Create(ctx, dep)
+		config := r.statefulSetForSRSConf(srsInstance, serviceName)
+		log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", config.Namespace, "ConfigMap.Name", config.Name)
+		err = r.Create(ctx, config)
 		if err != nil {
-			log.Error(err, "Failed to create new StatefulSet", "StatefulSet.Namespace", dep.Namespace, "StatefulSet.Name", dep.Name)
+			log.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", config.Namespace, "ConfigMap.Name", config.Name)
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		log.Error(err, "Failed to get ConfigMap")
+		return ctrl.Result{}, err
+	}
+
+	// Check if the stateful already exists, if not create a new one
+	statefulSetfound := &appsv1.StatefulSet{}
+	err = r.Get(ctx, types.NamespacedName{Name: srsInstance.Name, Namespace: srsInstance.Namespace}, statefulSetfound)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new deployment
+		stat := r.statefulSetForSRS(srsInstance, serviceName)
+		log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", stat.Namespace, "StatefulSet.Name", stat.Name)
+		err = r.Create(ctx, stat)
+		if err != nil {
+			log.Error(err, "Failed to create new StatefulSet", "StatefulSet.Namespace", stat.Namespace, "StatefulSet.Name", stat.Name)
 			return ctrl.Result{}, err
 		}
 		// StatefulSet created successfully - return and requeue
@@ -86,11 +111,11 @@ func (r *SRSClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	// Ensure the deployment size is the same as the spec
 	size := srsInstance.Spec.Size
-	if *found.Spec.Replicas != size {
-		found.Spec.Replicas = &size
-		err = r.Update(ctx, found)
+	if *statefulSetfound.Spec.Replicas != size {
+		statefulSetfound.Spec.Replicas = &size
+		err = r.Update(ctx, statefulSetfound)
 		if err != nil {
-			log.Error(err, "Failed to update StatefulSet", "StatefulSet.Namespace", found.Namespace, "StatefulSet.Name", found.Name)
+			log.Error(err, "Failed to update StatefulSet", "StatefulSet.Namespace", statefulSetfound.Namespace, "StatefulSet.Name", statefulSetfound.Name)
 			return ctrl.Result{}, err
 		}
 		// Spec updated - return and requeue
@@ -123,19 +148,105 @@ func (r *SRSClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	return ctrl.Result{}, nil
 }
 
-// statefulSetForSRS returns a srs StatefulSet with the same name/namespace as the cr
-func (r *SRSClusterReconciler) statefulSetForSRS(cr *streamingv1alpha1.SRSCluster) *appsv1.StatefulSet {
+func pointerInt32(n int32) *int32 {
+	var i = new(int32)
+	*i = n
+	return i
+}
 
+// statefulSetForSRSConf returns a srs ConfigMap with the same name/namespace as the cr
+func (r *SRSClusterReconciler) statefulSetForSRSConf(cr *streamingv1alpha1.SRSCluster, serviceName string) *corev1.ConfigMap {
+	if cr.Spec.Config == nil {
+		cr.Spec.Config = &streamingv1alpha1.SRSConfigSpec{
+			Daemon: false,
+			Listen: pointerInt32(1935),
+			API: &streamingv1alpha1.SRSConfigServerSpec{
+				Enabled: true,
+				Listen:  pointerInt32(1985),
+			},
+			Server: &streamingv1alpha1.SRSConfigServerSpec{
+				Enabled: true,
+				Listen:  pointerInt32(8080),
+			},
+		}
+	}
+
+	var i int32
+	origins := []string{}
+	for i = 0; i < cr.Spec.Size; i++ {
+		origins = append(origins, cr.Name+"-"+string(i))
+	}
+	cr.Spec.Config.Origins = origins
+
+	// Configuration srs
+	tmplConfig, err := template.New("").Parse(`
+		listen              1935;
+		max_connections     1000;
+		daemon              off;
+
+		{{if .API}}
+		http_api {
+			enabled         on;
+			listen          1985;
+		}
+		{{end}}
+
+		{{if .Server}}
+		http_server {
+			enabled         on;
+			listen          8080;
+		}
+		{{end}}
+
+		vhost __defaultVhost__ {
+			enabled             on;
+			mix_correct         on;
+
+			cluster {
+				mode            local;
+				origin_cluster  on;
+				coworkers        {{range .Origins}}{{.}}.` + serviceName + `:1985{{end}};
+			}
+
+			hls {
+				enabled         on;
+				hls_fragment    6;
+				hls_window      30;
+				hls_path        ./objs/nginx/html;
+				hls_m3u8_file   [app]/default/[stream].m3u8;
+				hls_ts_file     [app]/default/[stream]-[timestamp].ts;
+				hls_cleanup     off;
+				hls_nb_notify   64;
+				hls_wait_keyframe       on;
+			}
+		}
+	`)
+
+	if err != nil {
+		panic(err)
+	}
+
+	var tpl bytes.Buffer
+	err = tmplConfig.Execute(&tpl, cr.Spec.Config)
+
+	ls := labelsForSRSCluster(cr.Name)
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cr.Namespace,
+			Labels:    ls,
+		},
+		Data: map[string]string{
+			"srs.conf": tpl.String(),
+		},
+	}
+}
+
+// statefulSetForSRS returns a srs StatefulSet with the same name/namespace as the cr
+func (r *SRSClusterReconciler) statefulSetForSRS(cr *streamingv1alpha1.SRSCluster, serviceName string) *appsv1.StatefulSet {
 	ls := labelsForSRSCluster(cr.Name)
 	img := "ossrs/srs:v4.0.56"
 	if len(cr.Spec.Image) > 0 {
 		img = cr.Spec.Image
-	}
-
-	serviceName := "srs_cluster_svc"
-
-	if len(cr.Spec.ServiceName) > 0 {
-		serviceName = cr.Spec.ServiceName
 	}
 
 	return &appsv1.StatefulSet{
