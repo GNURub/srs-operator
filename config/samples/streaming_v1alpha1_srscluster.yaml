@@ -5,3 +5,4 @@ metadata:
 spec:
   # SRS Origin servers
   size: 3
+  serviceName: rtmp
