@@ -1,0 +1,15 @@
+domain: srs
+layout: go.kubebuilder.io/v2
+multigroup: true
+projectName: srs
+repo: github.com/GNURub/srs-operator
+resources:
+- group: streaming
+  kind: SRSClusterNginx
+  version: v1alpha1
+- group: streaming
+  kind: SRSCluster
+  version: v1alpha1
+version: 3-alpha
+plugins:
+  go.sdk.operatorframework.io/v2-alpha: {}

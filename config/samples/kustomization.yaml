@@ -1,0 +1,5 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- streaming_v1alpha1_srsclusternginx.yaml
+- streaming_v1alpha1_srscluster.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
