@@ -18,7 +18,7 @@ UNDERCONSTRUCTION (doesnt works)
 - Nginx reads and delivers HLS. (Deployment and HPA).
 ``` yaml
     apiVersion: streaming.srs/v1alpha1
-    kind: SRSCluster
+    kind: SRSClusterNginx
     metadata:
         name: srsnginx-sample
     spec:
