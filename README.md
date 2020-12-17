@@ -2,7 +2,7 @@ UNDERCONSTRUCTION (doesnt works)
 
 ---
 
-- SRS Origin Cluster for a Large Number of Streams: SRS origin cluster is designed to serve a large number of streams. (StatefulSet).
+- [SRS Origin Cluster](https://github.com/ossrs/srs/wiki/v4_EN_OriginCluster) for a Large Number of Streams: SRS origin cluster is designed to serve a large number of streams. (StatefulSet).
 ``` yaml
     apiVersion: streaming.srs/v1alpha1
     kind: SRSCluster
